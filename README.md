@@ -3,7 +3,7 @@ Auto-failover orchestration tool for PostgreSQL based on Consul (prototyping)
 
 ## Deploying map
 
-
+![Deploying map](https://github.com/hypersleep/kalash/blob/master/map.png)
 
 Kalash automatically elect a leader using consul.
 
