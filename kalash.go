@@ -4,9 +4,20 @@ import (
 	"log"
 )
 
-func kalash() {
+func (c ServerCommand) kalash() {
 	log.Println("Starting kalash watcher")
-	for {
 
+	shutdownCh := makeShutdownCh()
+
+	c.waitGroup.Add(1)
+
+	defer c.waitGroup.Done()
+
+	for {
+		select {
+		case <- shutdownCh:
+			log.Println("Kalash watcher stopped")
+			return
+		}
 	}
 }

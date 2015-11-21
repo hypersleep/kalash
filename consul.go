@@ -4,10 +4,20 @@ import (
 	"log"
 )
 
-
-func consul() {
+func (c ServerCommand) consul() {
 	log.Println("Starting consul watcher")
-	for {
 
+	shutdownCh := makeShutdownCh()
+
+	c.waitGroup.Add(1)
+
+	defer c.waitGroup.Done()
+
+	for {
+		select {
+		case <- shutdownCh:
+			log.Println("Consul watcher stopped")
+			return
+		}
 	}
 }
