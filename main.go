@@ -26,6 +26,11 @@ func main() {
 				Ui: ui,
 			}, nil
 		},
+		"leave": func() (cli.Command, error) {
+			return LeaveCommand{
+				Ui: ui,
+			}, nil
+		},
     }
 
 	exitCode, err := c.Run()

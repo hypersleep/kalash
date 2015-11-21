@@ -12,3 +12,12 @@ Kalash configure master and standby nodes and try to start PostgreSQL service.
 If service successfully started it registers a consul service with health check.
 
 After health check passes, consul-template continuously changing a pgbonucer config and reload pgbonucer on changes. 
+
+## Usage
+
+usage: kalash [--version] [--help] command
+
+	Available commands are:
+	    leave     Leave kalash cluster
+	    server    Start kalash server
+	    status    Show kalash status

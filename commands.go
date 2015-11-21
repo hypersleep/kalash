@@ -4,6 +4,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	"net/rpc"
 
 	"github.com/mitchellh/cli"
 )
@@ -12,18 +13,25 @@ type (
 	ServerCommand struct {
 		Ui              cli.Ui
 		ShutdownCh      <- chan struct{}
-		watchersErrorCh <- chan int
+		watchersErrorCh chan int
 		waitGroup       sync.WaitGroup
+		rpcAddr         string
 
 	}
 
 	StatusCommand struct {
 		Ui cli.Ui
 	}
+
+	LeaveCommand struct {
+		Ui cli.Ui
+		rpcAddr string
+	}
 )
 
 func (c ServerCommand) Run(args []string) int {
 	log.Println("Starting kalash instance")
+	c.rpcAddr = "127.0.0.1:8543"
 	c.watchersErrorCh = make(chan int, 3)
 
 	go c.consul()
@@ -61,4 +69,32 @@ func (c StatusCommand) Help() string {
 
 func (c StatusCommand) Synopsis() string {
 	return "Show kalash status"
+}
+
+func (c LeaveCommand) Run(args []string) int {
+	c.rpcAddr = "127.0.0.1:8543"
+	client, err := rpc.DialHTTP("tcp", c.rpcAddr)
+	if err != nil {
+		log.Println("Dialing error:", err)
+		return 2
+	}
+
+	var reply string
+	err = client.Call("KalashRPC.Leave", 0, &reply)
+	if err != nil {
+		log.Println("Leave error:", err)
+		return 2
+	}
+
+	log.Println("Leave status:", reply)
+
+	return 0
+}
+
+func (c LeaveCommand) Help() string {
+	return "Help string"
+}
+
+func (c LeaveCommand) Synopsis() string {
+	return "Leave kalash cluster"
 }
