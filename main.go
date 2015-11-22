@@ -15,8 +15,8 @@ func main() {
 	c := cli.NewCLI("kalash", "0.0.1")
     c.Args = os.Args[1:]
     c.Commands = map[string]cli.CommandFactory{
-        "server": func() (cli.Command, error) {
-			return ServerCommand{
+        "join": func() (cli.Command, error) {
+			return JoinCommand{
 				Ui:                ui,
 				ShutdownCh:        makeShutdownCh(),
 			}, nil

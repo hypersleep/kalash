@@ -1,23 +1,26 @@
-# kalash
-Auto-failover orchestration tool for PostgreSQL based on Consul (prototyping)
+# Kalash
+Feel postgres like distributed database!
 
-## Deploying map
+Kalash is auto-failover and cluster orchestration tool for PostgreSQL based on Consul.
+
+> The AK-47 (also known as the Kalashnikov, AK, or in Russian slang, Kalash) is a selective-fire (semi-automatic and automatic), gas-operated 7.62×39mm assault rifle, developed in the Soviet Union by Mikhail Kalashnikov. It is officially known in the Soviet documentation as Avtomat Kalashnikova (Russian: Автомат Калашникова).
+
+## Deploying & Operational map
 
 ![Deploying map](https://github.com/hypersleep/kalash/blob/master/map.png)
 
 Kalash automatically elect a leader using consul.
 
-Kalash configure master and standby nodes and try to start PostgreSQL service.
-
-If service successfully started it registers a consul service with health check.
-
-After health check passes, consul-template continuously changing a pgbonucer config and reload pgbonucer on changes. 
+Kalash automatically configure master and standby, syncs them and trying to start PostgreSQL as child process on all cluster nodes.
+If postgres successfully started it registers a consul service with health check.
+After health check passes, consul-template continuously changing a pgbonucer config and reload pgbonucer on changes.
 
 ## Usage
 
-usage: kalash [--version] [--help] command
+	$ kalash
+	usage: kalash [--version] [--help] <command> [<args>]
 
 	Available commands are:
+	    join      Join kalash cluster
 	    leave     Leave kalash cluster
-	    server    Start kalash server
 	    status    Show kalash status

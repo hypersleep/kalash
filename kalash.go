@@ -15,7 +15,7 @@ type (
 )
 
 
-func (c ServerCommand) kalash() {
+func (c JoinCommand) kalash() {
 	log.Println("Starting kalash watcher")
 
 	shutdownCh := makeShutdownCh()

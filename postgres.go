@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-func (c ServerCommand) postgres() {
+func (c JoinCommand) postgres() {
 	log.Println("Starting postgres watcher")
 
 	shutdownCh := makeShutdownCh()

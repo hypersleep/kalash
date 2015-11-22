@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-func (c ServerCommand) consul() {
+func (c JoinCommand) consul() {
 	log.Println("Starting consul watcher")
 
 	shutdownCh := makeShutdownCh()
