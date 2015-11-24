@@ -1,11 +1,8 @@
 package main
 
 import (
-	"os"
 	"log"
 	"net"
-	"errors"
-	"syscall"
 	"net/rpc"
 	"net/http"
 )
@@ -48,13 +45,7 @@ func (c JoinCommand) kalash() {
 }
 
 func (kalash *KalashRPC) Leave(args *int, reply *string) error {
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		*reply = "ERROR"
-		return errors.New("Can't find process: " + err.Error())
-	}
-
-	p.Signal(syscall.SIGINT)
+	gracefulShutdown()
 
 	*reply = "OK"
 	return nil

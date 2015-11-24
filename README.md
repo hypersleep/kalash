@@ -13,7 +13,7 @@ Kalash automatically elect a leader using consul.
 
 Kalash automatically configure master and standby, syncs them and trying to start PostgreSQL as child process on all cluster nodes.
 If postgres successfully started it registers a consul service with health check.
-After health check passes, consul-template continuously changing a pgbonucer config and reload pgbonucer on changes.
+After health check passes, consul-template continuously changing a pgpool config and reload pgpool on changes.
 
 ## Usage
 

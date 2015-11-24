@@ -40,11 +40,16 @@ func main() {
 	}
 }
 
+func gracefulShutdown() {
+	p, _ := os.FindProcess(os.Getpid())
+	p.Signal(syscall.SIGINT)
+}
+
 func makeShutdownCh() <-chan struct{} {
 	resultCh := make(chan struct{})
 
 	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(signalCh, os.Interrupt)
 	go func() {
 		<-signalCh
 		resultCh <- struct{}{}
