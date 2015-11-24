@@ -5,7 +5,7 @@ Kalash is auto-failover and cluster orchestration tool for PostgreSQL based on C
 
 > The AK-47 (also known as the Kalashnikov, AK, or in Russian slang, Kalash) is a selective-fire (semi-automatic and automatic), gas-operated 7.62×39mm assault rifle, developed in the Soviet Union by Mikhail Kalashnikov. It is officially known in the Soviet documentation as Avtomat Kalashnikova (Russian: Автомат Калашникова).
 
-## Deploying & Operational map
+## Deployment & Operation map
 
 ![Deploying map](https://github.com/hypersleep/kalash/blob/master/map.png)
 
