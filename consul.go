@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"log"
 	"net/http"
 	consul "github.com/hashicorp/consul/api"
@@ -9,14 +10,14 @@ import (
 const LockKey = "kalash/leader"
 
 type LeaderElection struct {
-	client          *consul.Client
-	lock            *consul.Lock
-	gotLeaderCh     chan struct{}
-	leaderLostCh    <- chan struct{}
-	gotSlaveCh      chan struct{}
-	leaderChangedCh <- chan struct{}
-	leader          bool
-	leaderHostname  string
+	client         *consul.Client
+	lock           *consul.Lock
+	gotLeaderCh    chan struct{}
+	gotSlaveCh     chan struct{}
+	failCh         <- chan struct{}
+	leader         bool
+	leaderHostname string
+	nodeHostname     string
 }
 
 func (c JoinCommand) consul() {
@@ -40,29 +41,28 @@ func (c JoinCommand) consul() {
 	}
 
 	election := &LeaderElection{
-		client:          client,
-		gotLeaderCh:     make(chan struct{}),
-		leaderLostCh:    make(chan struct{}),
-		gotSlaveCh:      make(chan struct{}),
-		leaderChangedCh: make(chan struct{}),
+		client:       client,
+		gotLeaderCh:  make(chan struct{}),
+		gotSlaveCh:   make(chan struct{}),
+		failCh:       make(chan struct{}),
 	}
 
-	election.start()
+	go election.start()
 
 	for {
 		select {
 		case <- election.gotLeaderCh:
-			if !election.leader {
-				log.Println("Promote this node to master")
-			}
+			// if !node.leader {
+			// 	log.Println("Promote this node to master")
+			// }
 			log.Println("Starting postgres as master")
 			log.Println("Postgres successfully started as master")
 			log.Println("Registring consul health check")
 			log.Println("Consul health check successfully registred")
-		case <- election.leaderLostCh:
-			log.Println("Leadership lost")
-			election.start()
 		case <- election.gotSlaveCh:
+			// if node.leader {
+			// 	log.Println("Promote this node to slave")
+			// }
 			log.Println("Stopping postgres")
 			log.Println("Postgres succesfully stopped")
 			log.Println("Try to sync with master")
@@ -71,9 +71,9 @@ func (c JoinCommand) consul() {
 			log.Println("Postgres successfully started as slave")
 			log.Println("Registring consul health check")
 			log.Println("Consul health check successfully registred")
-		case <- election.leaderChangedCh:
-			log.Println("Leader changed, try to sync")
-			election.start()
+		case <- election.failCh:
+			log.Println("Restarting leader election")
+			go election.start()
 		case <- shutdownCh:
 			log.Println("Consul watcher stopped")
 			election.stop()
@@ -85,44 +85,52 @@ func (c JoinCommand) consul() {
 func (e *LeaderElection) start() {
 	log.Println("Looking for leader...")
 
-	lock, err := e.client.LockKey(LockKey)
+	e.nodeHostname, _ = os.Hostname()
+
+	kv := e.client.KV()
+	pair, _, err := kv.Get(LockKey, nil)
 	if err != nil {
-		log.Println("Leader not found, try to acquire leadership")
+		log.Println("Failed to fetch leader key from consul")
+		gracefulShutdown()
+		return
 	}
 
-	go e.acquire(lock)
+	if pair != nil {
+		e.leaderHostname = string(pair.Value)
+		if e.leaderHostname != e.nodeHostname && pair.Session != "" {
+			log.Println("Leader found, this node is slave")
+			e.gotSlaveCh <- struct{}{}
+		}
+	}
+
+
+	lockOptions := &consul.LockOptions{
+		Key:   LockKey,
+		Value: []byte(e.nodeHostname),
+	}
+
+	go func() {
+		lock, _ := e.client.LockOpts(lockOptions)
+		failCh, err := lock.Lock(make(chan struct{}))
+		if err != nil {
+			log.Println("Cannot acquire leadership")
+			e.failCh = failCh
+			return
+		}
+
+		log.Println("Election won, this node is master")
+		e.failCh = failCh
+		e.lock = lock
+		e.leader = true
+		e.gotLeaderCh <- struct{}{}
+	}()
 }
 
 func (e *LeaderElection) stop() {
+	log.Println("Deregister health checks")
 	if e.leader {
 		e.leader = false
 		e.lock.Unlock()
 		e.lock.Destroy()
 	}
-}
-
-func (e *LeaderElection) acquire(lock *consul.Lock) {
-	leaderLostCh, err := lock.Lock(make(chan struct{}))
-	if err != nil {
-		log.Println("Cannot acquire leadership")
-
-		kv := e.client.KV()
-		pair, _, err := kv.Get(LockKey, nil)
-		if err != nil {
-			log.Println("Failed to fetch leader key from consul")
-			gracefulShutdown()
-			return
-		}
-
-		e.leaderHostname = string(pair.Value)
-		log.Println("Leader found, this node is slave")
-		e.gotSlaveCh <- struct{}{}
-		return
-	}
-
-	log.Println("Election win, this node is master")
-	e.lock = lock
-	e.leaderLostCh = leaderLostCh
-	e.leader = true
-	e.gotLeaderCh <- struct{}{}
 }
