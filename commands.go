@@ -36,7 +36,6 @@ func (c JoinCommand) Run(args []string) int {
 	c.watchersErrorCh = make(chan int, 3)
 
 	go c.consul()
-	go c.postgres()
 	go c.kalash()
 
 	select {

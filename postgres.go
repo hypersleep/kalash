@@ -1,23 +1,36 @@
 package main
 
 import (
-	"log"
+	"os/exec"
 )
 
-func (c JoinCommand) postgres() {
-	log.Println("Starting postgres watcher")
+type PostgresActor struct {
+	Master         bool
+	MasterHostname string
+	PgData         string
+	PgBin          string
+}
 
-	shutdownCh := makeShutdownCh()
-
-	c.waitGroup.Add(1)
-
-	defer c.waitGroup.Done()
-
-	for {
-		select {
-		case <- shutdownCh:
-			log.Println("Postgres watcher stopped")
-			return
-		}
+func (postgres *PostgresActor) Start() error {
+	cmd := exec.Command(postgres.PgBin + "/pg_ctl", "start", "-D", postgres.PgBin)
+	err := cmd.Run()
+	if err != nil {
+		return err
 	}
+
+	return nil
+}
+
+func (postgres *PostgresActor) Stop() error {
+	cmd := exec.Command(postgres.PgBin + "/pg_ctl", "start", "-D", postgres.PgBin)
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (postgres *PostgresActor) Sync(masterHostname string) error {
+	return nil
 }

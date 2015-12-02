@@ -7,7 +7,7 @@ import (
 	consul "github.com/hashicorp/consul/api"
 )
 
-const LockKey = "kalash/leader"
+const LockKey = "kalash/master"
 
 type LeaderElection struct {
 	client         *consul.Client
@@ -15,9 +15,9 @@ type LeaderElection struct {
 	gotLeaderCh    chan struct{}
 	gotSlaveCh     chan struct{}
 	failCh         <- chan struct{}
-	leader         bool
-	leaderHostname string
-	nodeHostname     string
+	master         bool
+	masterHostname string
+	nodeHostname   string
 }
 
 func (c JoinCommand) consul() {
@@ -47,62 +47,96 @@ func (c JoinCommand) consul() {
 		failCh:       make(chan struct{}),
 	}
 
-	go election.start()
+	go election.Start()
+
+	postgresActor := &PostgresActor{
+		PgData: "/usr/local/var/postgres",
+		PgBin:  "/usr/local/Cellar/postgresql/9.4.0/bin",
+	}
 
 	for {
 		select {
 		case <- election.gotLeaderCh:
-			// if !node.leader {
-			// 	log.Println("Promote this node to master")
-			// }
+			postgresActor.Master = true
+
 			log.Println("Starting postgres as master")
+			err = postgresActor.Start()
+			if err != nil {
+				log.Println("Failed to start postgres as master:", err)
+				gracefulShutdown()
+				return
+			}
+
 			log.Println("Postgres successfully started as master")
+
 			log.Println("Registring consul health check")
 			log.Println("Consul health check successfully registred")
 		case <- election.gotSlaveCh:
-			// if node.leader {
-			// 	log.Println("Promote this node to slave")
-			// }
+			postgresActor.Master = false
+
 			log.Println("Stopping postgres")
+			err = postgresActor.Stop()
+			if err != nil {
+				log.Println("Failed to stop postgres:", err)
+			}
+
 			log.Println("Postgres succesfully stopped")
+
 			log.Println("Try to sync with master")
+			err = postgresActor.Sync(election.masterHostname)
+			if err != nil {
+				log.Println("Failed to sync with postgres master:", err)
+				gracefulShutdown()
+				return
+			}
+
 			log.Println("Successfully synced with master")
-			log.Println("Strarting postgres as slave")
+
+
+			log.Println("Starting postgres as slave")
+			err = postgresActor.Start()
+			if err != nil {
+				log.Println("Failed to start postgres as slave:", err)
+				gracefulShutdown()
+				return
+			}
+
 			log.Println("Postgres successfully started as slave")
+
 			log.Println("Registring consul health check")
 			log.Println("Consul health check successfully registred")
 		case <- election.failCh:
-			log.Println("Restarting leader election")
-			go election.start()
+			log.Println("Restarting master election")
+			go election.Start()
 		case <- shutdownCh:
 			log.Println("Consul watcher stopped")
-			election.stop()
+			postgresActor.Stop()
+			election.Stop()
 			return
 		}
 	}
 }
 
-func (e *LeaderElection) start() {
-	log.Println("Looking for leader...")
+func (e *LeaderElection) Start() {
+	log.Println("Looking for master...")
 
 	e.nodeHostname, _ = os.Hostname()
 
 	kv := e.client.KV()
 	pair, _, err := kv.Get(LockKey, nil)
 	if err != nil {
-		log.Println("Failed to fetch leader key from consul")
+		log.Println("Failed to fetch master key from consul")
 		gracefulShutdown()
 		return
 	}
 
 	if pair != nil {
-		e.leaderHostname = string(pair.Value)
-		if e.leaderHostname != e.nodeHostname && pair.Session != "" {
+		e.masterHostname = string(pair.Value)
+		if e.masterHostname != e.nodeHostname && pair.Session != "" {
 			log.Println("Leader found, this node is slave")
 			e.gotSlaveCh <- struct{}{}
 		}
 	}
-
 
 	lockOptions := &consul.LockOptions{
 		Key:   LockKey,
@@ -113,7 +147,7 @@ func (e *LeaderElection) start() {
 		lock, _ := e.client.LockOpts(lockOptions)
 		failCh, err := lock.Lock(make(chan struct{}))
 		if err != nil {
-			log.Println("Cannot acquire leadership")
+			log.Println("Cannot acquire leadership: ", err)
 			e.failCh = failCh
 			return
 		}
@@ -121,15 +155,15 @@ func (e *LeaderElection) start() {
 		log.Println("Election won, this node is master")
 		e.failCh = failCh
 		e.lock = lock
-		e.leader = true
+		e.master = true
 		e.gotLeaderCh <- struct{}{}
 	}()
 }
 
-func (e *LeaderElection) stop() {
+func (e *LeaderElection) Stop() {
 	log.Println("Deregister health checks")
-	if e.leader {
-		e.leader = false
+	if e.master {
+		e.master = false
 		e.lock.Unlock()
 		e.lock.Destroy()
 	}
